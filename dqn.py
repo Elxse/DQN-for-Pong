@@ -91,15 +91,19 @@ def optimize(dqn, target_dqn, memory, optimizer):
     observations = torch.stack(observations, dim=0)
     #print(observations.shape)
     actions = torch.stack(actions, dim=0)
+
     next_observations = torch.stack(next_observations, dim=0)
     rewards = torch.stack(rewards, dim=0)
 
     # TODO: Compute the current estimates of the Q-values for each state-action
     #       pair (s,a). Here, torch.gather() is useful for selecting the Q-values
     #       corresponding to the chosen actions.
-    #print(actions.shape)
+    actions = torch.unsqueeze(actions, 1)
+    print(actions.shape)
+    print(actions)
     output = dqn.forward(observations)
-    #print(output.shape)
+    print(output.shape)
+    print(output)
     q_values = torch.gather(input=output, dim=0, index=actions)
 
     # TODO: Compute the Q-value targets. Only do this for non-terminal transitions!

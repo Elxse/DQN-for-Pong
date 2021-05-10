@@ -12,7 +12,7 @@ from dqn import DQN, ReplayMemory, optimize
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--env', choices=['CartPole-v0'])
+parser.add_argument('--env', default='CartPole-v0', choices=['CartPole-v0'])
 parser.add_argument('--evaluate_freq', type=int, default=25, help='How often to run evaluation.', nargs='?')
 parser.add_argument('--evaluation_episodes', type=int, default=5, help='Number of evaluation episodes.', nargs='?')
 
@@ -69,6 +69,13 @@ if __name__ == '__main__':
 			#print("	ACTION:", action)
 			#print("	NEXT_OBS: ", next_obs)
 			#print("	REWARD:", reward)
+			if not torch.is_tensor(next_obs):
+				next_obs = torch.from_numpy(next_obs)
+
+			if next_obs.shape[0] == 4:
+				next_obs = torch.unsqueeze(next_obs,0)
+				next_obs = next_obs.to(device='cuda')
+
 			memory.push(obs, torch.as_tensor(action), next_obs, torch.as_tensor(reward))
 			
 			# TODO: Run DQN.optimize() every env_config["train_frequency"] steps.
