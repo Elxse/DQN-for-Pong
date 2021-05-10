@@ -58,7 +58,7 @@ class DQN(nn.Module):
 
         return x
 
-    def act(self, observation, exploit=False):
+    def act(self, observation, epsilon, exploit=False):
         """Selects an action with an epsilon-greedy exploration strategy."""
         # TODO: Implement action selection using the Deep Q-network. This function
         #       takes an observation tensor and should return a tensor of actions.
@@ -67,9 +67,10 @@ class DQN(nn.Module):
         # TODO: Implement epsilon-greedy exploration.
 
         batch_size = observation.shape[0]
-        if random.random() > self.eps_start:
+
+        if random.random() > epsilon:
             output = self.forward(observation)
-            actions = torch.argmax(output, dim=0)  # action that has the largest predicted Q-value
+            actions = torch.argmax(output, dim=1)  # action that has the largest predicted Q-value
         else:
             random_actions = [random.randrange(self.n_actions) for _ in range(batch_size)]
             actions = torch.tensor(random_actions)
@@ -77,7 +78,7 @@ class DQN(nn.Module):
         return actions.unsqueeze(1)
         #raise NotImplmentedError
 
-def optimize(dqn, target_dqn, memory, optimizer):
+def optimize(dqn, target_dqn, memory, optimizer, isTerminal=False):
     """This function samples a batch from the replay buffer and optimizes the Q-network."""
     # If we don't have enough transitions stored yet, we don't train.
     if len(memory) < dqn.batch_size:
@@ -115,7 +116,10 @@ def optimize(dqn, target_dqn, memory, optimizer):
     q_values = torch.gather(input=output, dim=0, index=actions)
 
     # TODO: Compute the Q-value targets. Only do this for non-terminal transitions!
-    q_value_targets = rewards + dqn.gamma * torch.max(target_dqn.forward(next_observations))
+    if not isTerminal:
+        q_value_targets = rewards + dqn.gamma * torch.max(target_dqn.forward(next_observations))
+    else:
+        q_value_targets = rewards
     
     # Compute loss.
     # loss = F.mse_loss(q_values.squeeze(), q_value_targets)

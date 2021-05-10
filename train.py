@@ -21,6 +21,13 @@ ENV_CONFIGS = {
 	'CartPole-v0': config.CartPole
 }
 
+
+def init_wb(model):
+	if isinstance(model, torch.nn.Linear):
+		torch.nn.init.normal_(model.weight, mean=0, std=0.01)
+		torch.nn.init.zeros_(model.bias)
+
+
 if __name__ == '__main__':
 	args = parser.parse_args()
 
@@ -30,6 +37,8 @@ if __name__ == '__main__':
 
 	# Initialize deep Q-networks.
 	dqn = DQN(env_config=env_config).to(device)
+	# wb_ini = init_wb
+	dqn.apply(init_wb)
 
 	# TODO: Create and initialize target Q-network.
 	target_dqn = DQN(env_config=env_config).to(device)
@@ -44,6 +53,11 @@ if __name__ == '__main__':
 	# Keep track of best evaluation mean return achieved so far.
 	best_mean_return = -float("Inf")
 
+	eps_start = env_config["eps_start"]
+	eps_end = env_config["eps_end"]
+	anneal_length = env_config["anneal_length"]
+	eps_step = (eps_start - eps_end) / anneal_length
+
 	for episode in range(env_config['n_episodes']):
 		done = False
 		t = 0 # Number of steps
@@ -53,7 +67,9 @@ if __name__ == '__main__':
 		
 		while not done:
 			# TODO: Get action from DQN.
-			action = dqn.act(obs).item()
+			action = dqn.act(obs, eps_start).item()
+			if eps_start >= eps_end:
+				eps_start -= eps_step
 
 			# Act in the true environment.
 			#obs, reward, done, info = env.step(action)
@@ -81,10 +97,10 @@ if __name__ == '__main__':
 			
 			# TODO: Run DQN.optimize() every env_config["train_frequency"] steps.
 			if t % env_config["train_frequency"] == 0:
-				optimize(dqn, target_dqn, memory, optimizer)
+				optimize(dqn, target_dqn, memory, optimizer, done)
 
 			# TODO: Update the target network every env_config["target_update_frequency"] steps.
-			if t % env_config["train_frequency"] == 0:
+			if t % env_config["target_update_frequency"] == 0:
 				target_dqn.load_state_dict(dqn.state_dict())
 
 			t += 1
@@ -92,7 +108,7 @@ if __name__ == '__main__':
 
 		# Evaluate the current agent.
 		if episode % args.evaluate_freq == 0:
-			mean_return = evaluate_policy(dqn, env, env_config, args, n_episodes=args.evaluation_episodes)
+			mean_return = evaluate_policy(dqn, env, env_config, args, eps_start, n_episodes=args.evaluation_episodes)
 			
 			print(f'Episode {episode}/{env_config["n_episodes"]}: {mean_return}')
 
