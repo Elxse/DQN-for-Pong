@@ -49,6 +49,7 @@ if __name__ == '__main__':
 		t = 0 # Number of steps
 
 		obs = preprocess(env.reset(), env=args.env).unsqueeze(0) # Tensor of shape (1,4)
+		# print(obs.shape)
 		
 		while not done:
 			# TODO: Get action from DQN.
@@ -74,7 +75,7 @@ if __name__ == '__main__':
 
 			if next_obs.shape[0] == 4:
 				next_obs = torch.unsqueeze(next_obs,0)
-				next_obs = next_obs.to(device='cuda')
+				next_obs = next_obs.to(device)
 
 			memory.push(obs, torch.as_tensor(action), next_obs, torch.as_tensor(reward))
 			

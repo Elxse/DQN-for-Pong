@@ -66,14 +66,15 @@ class DQN(nn.Module):
         #       the input would be a [32, 4] tensor and the output a [32, 1] tensor.
         # TODO: Implement epsilon-greedy exploration.
 
+        batch_size = observation.shape[0]
         if random.random() > self.eps_start:
-            state = torch.tensor([observation]).to(device)
-            actions = self.forward(state)
-            action = torch.argmax(actions) # action that has the largest predicted Q-value
+            output = self.forward(observation)
+            actions = torch.argmax(output, dim=0)  # action that has the largest predicted Q-value
         else:
-            action = torch.tensor(random.randrange(self.n_actions))
-            
-        return action
+            random_actions = [random.randrange(self.n_actions) for _ in range(batch_size)]
+            actions = torch.tensor(random_actions)
+            # print(observation.shape, actions.shape)
+        return actions.unsqueeze(1)
         #raise NotImplmentedError
 
 def optimize(dqn, target_dqn, memory, optimizer):
@@ -88,29 +89,37 @@ def optimize(dqn, target_dqn, memory, optimizer):
     #       Note that special care is needed for terminal transitions!
     observations, actions, next_observations, rewards = memory.sample(dqn.batch_size)
     #print(observations)
-    observations = torch.stack(observations, dim=0)
+    observations = torch.cat(observations)  # [32, 4]
+    observations = observations.to(device)
+    # actions = torch.cat(actions)  # [32, 1]
+    next_observations = torch.cat(next_observations).float()  # [32, 4]
+    next_observations = next_observations.to(device)
+    # rewards = torch.cat(rewards)
+    # observations = torch.stack(observations, dim=0)
     #print(observations.shape)
+    # actions = torch.tensor(actions)
     actions = torch.stack(actions, dim=0)
+    actions = torch.unsqueeze(actions, 1)
 
-    next_observations = torch.stack(next_observations, dim=0)
+    # next_observations = torch.stack(next_observations, dim=0)
     rewards = torch.stack(rewards, dim=0)
+    rewards = torch.unsqueeze(rewards, 1)
+    rewards = rewards.to(device)
 
     # TODO: Compute the current estimates of the Q-values for each state-action
     #       pair (s,a). Here, torch.gather() is useful for selecting the Q-values
     #       corresponding to the chosen actions.
-    actions = torch.unsqueeze(actions, 1)
-    print(actions.shape)
-    print(actions)
+    actions = actions.to(device)
     output = dqn.forward(observations)
-    print(output.shape)
-    print(output)
+    output = output.to(device)
     q_values = torch.gather(input=output, dim=0, index=actions)
 
     # TODO: Compute the Q-value targets. Only do this for non-terminal transitions!
     q_value_targets = rewards + dqn.gamma * torch.max(target_dqn.forward(next_observations))
     
     # Compute loss.
-    loss = F.mse_loss(q_values.squeeze(), q_value_targets)
+    # loss = F.mse_loss(q_values.squeeze(), q_value_targets)
+    loss = F.mse_loss(q_values, q_value_targets)
 
     # Perform gradient descent.
     optimizer.zero_grad()
