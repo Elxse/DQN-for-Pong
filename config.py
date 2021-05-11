@@ -20,12 +20,12 @@ CartPole = {
     'memory_size': 50000,
     'n_episodes': 1000,
     'batch_size': 32,
-    'target_update_frequency': 100,
+    'target_update_frequency': 100, # 100 
     'train_frequency': 1,
     'gamma': 0.95,
     'lr': 1e-4,
-    'eps_start': 1.0,
+    'eps_start': 1,
     'eps_end': 0.05,
-    'anneal_length': 10**4,
+    'anneal_length': 10**4, # 10**4
     'n_actions': 2,
 }
