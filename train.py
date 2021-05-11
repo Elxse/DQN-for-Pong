@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 
 import config
-from utils import preprocess
+from utils import preprocess, init_weights, plot_result
 from evaluate import evaluate_policy
 from dqn import DQN, ReplayMemory, optimize
 
@@ -23,19 +23,6 @@ ENV_CONFIGS = {
 	'CartPole-v0': config.CartPole
 }
 
-
-def init_weights(model):
-	if isinstance(model, torch.nn.Linear):
-		torch.nn.init.normal_(model.weight, mean=0, std=0.01)
-		torch.nn.init.zeros_(model.bias)
-
-def plot_result(x, y, xlabel, ylabel):
-	plt.plot(x, y)
-	plt.xlabel(xlabel)
-	plt.ylabel(ylabel)
-	plt.show()
-
-
 if __name__ == '__main__':
 	args = parser.parse_args()
 
@@ -47,7 +34,7 @@ if __name__ == '__main__':
 	dqn = DQN(env_config=env_config).to(device)
 	dqn.apply(init_weights)
 
-	# TODO: Create and initialize target Q-network.
+	# Create and initialize target Q-network.
 	target_dqn = DQN(env_config=env_config).to(device)
 	target_dqn.load_state_dict(dqn.state_dict())
 
@@ -60,54 +47,62 @@ if __name__ == '__main__':
 	# Keep track of best evaluation mean return achieved so far.
 	best_mean_return = -float("Inf")
 
+	# Compute the value for epsilon linear annealing.
 	eps = dqn.eps_start
 	eps_end = dqn.eps_end
-	eps_step = dqn.eps_step
+	anneal_length = dqn.anneal_length
+	eps_step = (eps - eps_end) / anneal_length
 
-	losses_list, reward_list, step_list, epsilon_list = [], [], [], []
+	# Initialize lists to keep track of episodes' loss, return, number of steps, and epsilon values throughout the training
+	loss_list, return_list, step_list, epsilon_list = [], [], [], []
 	
-	t = 0 # Total number of steps
+	total_steps = 0
 
 	for episode in range(env_config['n_episodes']):
 		done = False
 		
-		losses = 0
-		total_reward = 0
-		
-		obs = preprocess(env.reset(), env=args.env).unsqueeze(0) # Tensor of shape (1,4)
+		episode_loss = 0
+		episode_return = 0
+		episode_steps = 0
+
+		obs = preprocess(env.reset(), env=args.env).unsqueeze(0) # Tensor [1,4]
 		
 		while not done:
-			t += 1
+			total_steps += 1
+			episode_steps += 1
 
-			# TODO: Get action from DQN.
+			# Get action from DQN.
 			action = dqn.act(obs, eps).item()
 
 			# Act in the true environment.
 			next_obs, reward, done, info = env.step(action)
-			total_reward += reward
+			episode_return += reward
 
 			# Preprocess incoming observation.
 			if not done:
-				next_obs = preprocess(next_obs, env=args.env).unsqueeze(0) # Phi_t+1
+				# Preprocess the non-terminal state.
+				next_obs = preprocess(next_obs, env=args.env).unsqueeze(0)
 			else:
+				# Set to None the terminal state.
 				next_obs = None
 			
-			# TODO: Add the transition to the replay memory. Remember to convert
-			#       everything to PyTorch tensors!
+			# Add the transition to the replay memory.
 			memory.push(obs, torch.as_tensor(action), next_obs, torch.as_tensor(reward))
 			
-			# TODO: Run DQN.optimize() every env_config["train_frequency"] steps.
-			if t % env_config["train_frequency"] == 0:
+			# Run DQN.optimize() every env_config["train_frequency"] steps.
+			if total_steps % env_config["train_frequency"] == 0:
 				loss = optimize(dqn, target_dqn, memory, optimizer)
-				losses += loss
+				episode_loss += loss
 
-			# TODO: Update the target network every env_config["target_update_frequency"] steps.
-			if t % env_config["target_update_frequency"] == 0:
+			# Update the target network every env_config["target_update_frequency"] steps.
+			if total_steps % env_config["target_update_frequency"] == 0:
 				target_dqn.load_state_dict(dqn.state_dict())
 
+			# Update the current observation.
 			obs = next_obs
 		
-			# Update after each step
+			# Update epsilon after each step.
+			epsilon_list.append(eps)
 			if eps > eps_end:
 				eps -= eps_step
 
@@ -125,12 +120,9 @@ if __name__ == '__main__':
 				torch.save(dqn, f'models/{args.env}_best.pt')
 		
 
-		losses_list.append(losses/t)
-		reward_list.append(total_reward)
-		#step_list.append(t)
-		epsilon_list.append(eps)
-		
-		#print(f"step = {t}")
+		loss_list.append(episode_loss/episode_steps)
+		return_list.append(episode_return)
+		step_list.append(episode_steps)
 		
 	# Close environment after training is completed.
 	env.close()
@@ -138,7 +130,7 @@ if __name__ == '__main__':
 
 	# Plot
 	x_axis = range(env_config['n_episodes'])
-	plot_result(x_axis, reward_list, "Episodes", "Reward")
-	plot_result(x_axis, losses_list, "Episodes", "Losses")
-	#plot_result(x_axis, step_list, "Episodes", "Number of steps")
-	plot_result(x_axis, epsilon_list, "Episodes", "Epsilon")
+	plot_result(x_axis, return_list, "Episodes", "Return", "Return vs. Number of episodes")
+	plot_result(x_axis, loss_list, "Episodes", "Loss", "Loss vs. Number of episodes")
+	plot_result(x_axis, step_list, "Episodes", "Number of steps", "Number of steps per episode")
+	plot_result(range(total_steps), epsilon_list, "Steps", "Epsilon", "Epsilon values at each step of the training")

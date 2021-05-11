@@ -43,7 +43,6 @@ class DQN(nn.Module):
 		self.eps_start = env_config["eps_start"]
 		self.eps_end = env_config["eps_end"]
 		self.anneal_length = env_config["anneal_length"]
-		self.eps_step = (self.eps_start - self.eps_end) / self.anneal_length 
 		self.n_actions = env_config["n_actions"]
 
 		self.fc1 = nn.Linear(4, 256)
@@ -60,29 +59,35 @@ class DQN(nn.Module):
 		return x
 
 	def act(self, observation, epsilon, exploit=False):
-		"""Selects an action with an epsilon-greedy exploration strategy."""
-		# TODO: Implement action selection using the Deep Q-network. This function
-		#       takes an observation tensor and should return a tensor of actions.
-		#       For example, if the state dimension is 4 and the batch size is 32,
-		#       the input would be a [32, 4] tensor and the output a [32, 1] tensor.
-		# TODO: Implement epsilon-greedy exploration.
+		"""Selects an action with an epsilon-greedy exploration strategy.
+		
+		Args:
+			observation (tensor): observation tensor of shape [batch_size, state_dimension] (e.g. [32, 4])
+			epsilon (int)
+			exploit (bool): if True, acts greedily
+
+		Returns:
+			actions (tensor): tensor of actions according to the epsilon-greedy strategy, of shape [batch_size, 1]
+		"""
 		
 		batch_size = observation.shape[0]
 		rand_value = random.random()
+
 		if exploit or rand_value > epsilon:
+			# Choose the action which gives the largest Q-values for each observation
 			with torch.no_grad():
 				output = self.forward(observation)
 			actions = torch.argmax(output, dim=1) 
-			#print(f"output = {output}")
-			#print(f"actions = {actions}")
 		else:
+			# Choose a random action for each observation
 			random_actions = [random.randrange(self.n_actions) for _ in range(batch_size)]
 			actions = torch.tensor(random_actions)
-			#print(f"actions = {actions}")
+
 		return actions.unsqueeze(1)
 
 def optimize(dqn, target_dqn, memory, optimizer):
 	"""This function samples a batch from the replay buffer and optimizes the Q-network."""
+
 	# If we don't have enough transitions stored yet, we don't train.
 	if len(memory) < dqn.batch_size:
 		return 0
@@ -97,7 +102,6 @@ def optimize(dqn, target_dqn, memory, optimizer):
 	observations = observations.to(device)
 
 	non_terminal_next_observations = [next_obs for next_obs in next_observations if next_obs is not None]
-	#print(len(non_terminal_next_observations))
 	non_terminal_next_observations = torch.cat(non_terminal_next_observations).float()
 	non_terminal_next_observations = non_terminal_next_observations.to(device)
 
@@ -115,29 +119,19 @@ def optimize(dqn, target_dqn, memory, optimizer):
 	output = dqn.forward(observations) # [32, 2]
 	output = output.to(device)
 	q_values = torch.gather(input=output, index=actions, dim=1)
-	#print(f"output = {output}\n, actions = {actions}\n, q_values = {q_values}\n")
 
 	# TODO: Compute the Q-value targets. Only do this for non-terminal transitions!
 	non_terminal_mask = torch.BoolTensor(list(map(lambda obs: obs is not None, next_observations))) # indices for non terminal transitions
 	terminal_mask = ~non_terminal_mask # indices for terminal transitions
 	target_dqn_qpred = target_dqn.forward(non_terminal_next_observations) 
 	target_dqn_qpred_max = torch.max(target_dqn_qpred, axis=1)[0].unsqueeze(1)
-	#print(target_dqn_qpred)
-	#print(target_dqn_qpred_max)
-	#print(rewards[non_terminal_mask])
+	
 	q_value_targets = torch.zeros(dqn.batch_size, 1)
 	q_value_targets[non_terminal_mask] = rewards[non_terminal_mask] + dqn.gamma * target_dqn_qpred_max
 	q_value_targets[terminal_mask] = rewards[terminal_mask]
 	
-	#if not isTerminal:
-	#	q_value_targets = rewards + dqn.gamma * torch.max(target_dqn.forward(next_observations))
-	#else:
-	#	q_value_targets = rewards
-	
 	# Compute loss.
-	#loss = F.mse_loss(q_values.squeeze(), q_value_targets)
 	loss = F.mse_loss(q_values, q_value_targets)
-	#print(f"loss = {loss}")
 
 	# Perform gradient descent.
 	optimizer.zero_grad()
