@@ -10,7 +10,7 @@ gamma: Discount factor.
 lr: Learning rate used for optimizer.
 eps_start: Starting value for epsilon (linear annealing).
 eps_end: Final value for epsilon (linear annealing).
-anneal_length: How many steps to anneal epsilon for (Number of steps over which the initial value of epsilon is linearly annealed to its final value).
+anneal_length: How many steps to anneal epsilon for.
 n_actions: The number of actions can easily be accessed with env.action_space.n, but we do
     some manual engineering to account for the fact that Pong has duplicate actions.
 """
@@ -20,7 +20,7 @@ CartPole = {
     'memory_size': 50000,
     'n_episodes': 1000,
     'batch_size': 32,
-    'target_update_frequency': 100,
+    'target_update_frequency': 100, # 100 
     'train_frequency': 1,
     'gamma': 0.95,
     'lr': 1e-4,

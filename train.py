@@ -65,13 +65,14 @@ if __name__ == '__main__':
 	eps_step = dqn.eps_step
 
 	losses_list, reward_list, step_list, epsilon_list = [], [], [], []
+	
+	t = 0 # Total number of steps
 
 	for episode in range(env_config['n_episodes']):
 		done = False
 		
 		losses = 0
 		total_reward = 0
-		t = 0 # Number of steps
 		
 		obs = preprocess(env.reset(), env=args.env).unsqueeze(0) # Tensor of shape (1,4)
 		
@@ -87,10 +88,7 @@ if __name__ == '__main__':
 
 			# Preprocess incoming observation.
 			if not done:
-				next_obs = preprocess(next_obs, env=args.env).unsqueeze(0) # tensor
-				#if next_obs.shape[0] == 4:
-				#	next_obs = torch.unsqueeze(next_obs, 0)
-				#	next_obs = next_obs.to(device)
+				next_obs = preprocess(next_obs, env=args.env).unsqueeze(0) # Phi_t+1
 			else:
 				next_obs = None
 			
@@ -100,7 +98,6 @@ if __name__ == '__main__':
 			
 			# TODO: Run DQN.optimize() every env_config["train_frequency"] steps.
 			if t % env_config["train_frequency"] == 0:
-				#print("hre")
 				loss = optimize(dqn, target_dqn, memory, optimizer)
 				losses += loss
 
@@ -109,6 +106,10 @@ if __name__ == '__main__':
 				target_dqn.load_state_dict(dqn.state_dict())
 
 			obs = next_obs
+		
+			# Update after each step
+			if eps > eps_end:
+				eps -= eps_step
 
 		# Evaluate the current agent.
 		if episode % args.evaluate_freq == 0:
@@ -123,17 +124,13 @@ if __name__ == '__main__':
 				print('Best performance so far! Saving model.')
 				torch.save(dqn, f'models/{args.env}_best.pt')
 		
-		# Update after each episode
-		if eps > eps_end:
-			eps -= eps_step
 
 		losses_list.append(losses/t)
 		reward_list.append(total_reward)
 		#step_list.append(t)
 		epsilon_list.append(eps)
-
 		
-		#print(f"t = {t}")
+		#print(f"step = {t}")
 		
 	# Close environment after training is completed.
 	env.close()
@@ -142,6 +139,6 @@ if __name__ == '__main__':
 	# Plot
 	x_axis = range(env_config['n_episodes'])
 	plot_result(x_axis, reward_list, "Episodes", "Reward")
-	#plot_result(x_axis, losses_list, "Episodes", "Losses")
+	plot_result(x_axis, losses_list, "Episodes", "Losses")
 	#plot_result(x_axis, step_list, "Episodes", "Number of steps")
-	#plot_result(x_axis, epsilon_list, "Episodes", "Epsilon")
+	plot_result(x_axis, epsilon_list, "Episodes", "Epsilon")

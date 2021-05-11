@@ -69,12 +69,16 @@ class DQN(nn.Module):
 		
 		batch_size = observation.shape[0]
 		rand_value = random.random()
-		if rand_value > epsilon:
-			output = self.forward(observation)
-			actions = torch.argmax(output, dim=1)  # action that has the largest predicted Q-value
+		if exploit or rand_value > epsilon:
+			with torch.no_grad():
+				output = self.forward(observation)
+			actions = torch.argmax(output, dim=1) 
+			#print(f"output = {output}")
+			#print(f"actions = {actions}")
 		else:
 			random_actions = [random.randrange(self.n_actions) for _ in range(batch_size)]
 			actions = torch.tensor(random_actions)
+			#print(f"actions = {actions}")
 		return actions.unsqueeze(1)
 
 def optimize(dqn, target_dqn, memory, optimizer):
@@ -92,8 +96,6 @@ def optimize(dqn, target_dqn, memory, optimizer):
 	observations = torch.cat(observations)  # [32, 4]
 	observations = observations.to(device)
 
-	non_terminal_mask = torch.BoolTensor(list(map(lambda obs: obs is not None, next_observations)))
-	terminal_mask = ~non_terminal_mask
 	non_terminal_next_observations = [next_obs for next_obs in next_observations if next_obs is not None]
 	#print(len(non_terminal_next_observations))
 	non_terminal_next_observations = torch.cat(non_terminal_next_observations).float()
@@ -116,7 +118,9 @@ def optimize(dqn, target_dqn, memory, optimizer):
 	#print(f"output = {output}\n, actions = {actions}\n, q_values = {q_values}\n")
 
 	# TODO: Compute the Q-value targets. Only do this for non-terminal transitions!
-	target_dqn_qpred = target_dqn.forward(non_terminal_next_observations)
+	non_terminal_mask = torch.BoolTensor(list(map(lambda obs: obs is not None, next_observations))) # indices for non terminal transitions
+	terminal_mask = ~non_terminal_mask # indices for terminal transitions
+	target_dqn_qpred = target_dqn.forward(non_terminal_next_observations) 
 	target_dqn_qpred_max = torch.max(target_dqn_qpred, axis=1)[0].unsqueeze(1)
 	#print(target_dqn_qpred)
 	#print(target_dqn_qpred_max)
