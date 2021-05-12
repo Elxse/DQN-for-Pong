@@ -34,9 +34,11 @@ class ReplayMemory:
 
 
 class DQN(nn.Module):
-	def __init__(self, env_config):
+	def __init__(self, env_name, env_config):
 		super(DQN, self).__init__()
-
+		
+		self.env_name = env_name
+		
 		# Save hyperparameters needed in the DQN class.
 		self.batch_size = env_config["batch_size"]
 		self.gamma = env_config["gamma"]
@@ -44,18 +46,34 @@ class DQN(nn.Module):
 		self.eps_end = env_config["eps_end"]
 		self.anneal_length = env_config["anneal_length"]
 		self.n_actions = env_config["n_actions"]
-
-		self.fc1 = nn.Linear(4, 256)
-		self.fc2 = nn.Linear(256, self.n_actions)
-
+		
+		if self.env_name == 'CartPole-v0':
+			self.fc1 = nn.Linear(4, 256)
+			self.fc2 = nn.Linear(256, self.n_actions)
+		elif self.env_name == 'Pong-v0':
+			self.conv1 = nn.Conv2d(4, 32, kernel_size=8, stride=4, padding=0)
+			self.conv2 = nn.Conv2d(32, 64, kernel_size=4, stride=2, padding=0)
+			self.conv3 = nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=0)
+			self.fc1 = nn.Linear(3136, 512)
+			self.fc2 = nn.Linear(512, self.n_actions)
+			
 		self.relu = nn.ReLU()
 		self.flatten = nn.Flatten()
 
 	def forward(self, x):
 		"""Runs the forward pass of the NN depending on architecture."""
-		x = self.relu(self.fc1(x))
-		x = self.fc2(x)
-
+		
+		if self.env_name == 'CartPole-v0':
+			x = self.relu(self.fc1(x))
+			x = self.fc2(x)
+		if self.env_name == 'Pong-v0':
+			x = self.relu(self.conv1(x))
+			x = self.relu(self.conv2(x))
+			x = self.relu(self.conv3(x))
+			x = self.flatten(x)
+			x = self.relu(self.fc1(x))
+			x = self.fc2(x)
+		
 		return x
 
 	def act(self, observation, epsilon, exploit=False):
@@ -76,8 +94,9 @@ class DQN(nn.Module):
 		if exploit or rand_value > epsilon:
 			# Choose the action which gives the largest Q-values for each observation
 			with torch.no_grad():
+				#print(f"In act, obs.shape = {observation.shape}")
 				output = self.forward(observation)
-			actions = torch.argmax(output, dim=1) 
+				actions = torch.argmax(output, dim=1) 
 		else:
 			# Choose a random action for each observation
 			random_actions = [random.randrange(self.n_actions) for _ in range(batch_size)]
@@ -93,18 +112,19 @@ def optimize(dqn, target_dqn, memory, optimizer):
 		return 0
 
 	# TODO: Sample a batch from the replay memory and concatenate so that there are
-	#       four tensors in total: observations, actions, next observations and rewards.
-	#       Remember to move them to GPU if it is available, e.g., by using Tensor.to(device).
-	#       Note that special care is needed for terminal transitions!
+	#	   four tensors in total: observations, actions, next observations and rewards.
+	#	   Remember to move them to GPU if it is available, e.g., by using Tensor.to(device).
+	#	   Note that special care is needed for terminal transitions!
 	observations, actions, next_observations, rewards = memory.sample(dqn.batch_size)
 	
 	observations = torch.cat(observations)  # [32, 4]
 	observations = observations.to(device)
-
+	#print(observations.shape)
 	non_terminal_next_observations = [next_obs for next_obs in next_observations if next_obs is not None]
+	#print(len(non_terminal_next_observations), non_terminal_next_observations[0].shape)
 	non_terminal_next_observations = torch.cat(non_terminal_next_observations).float()
 	non_terminal_next_observations = non_terminal_next_observations.to(device)
-
+	
 	actions = torch.stack(actions, dim=0)
 	actions = torch.unsqueeze(actions, 1) # [32, 1]
 	actions = actions.to(device)
@@ -114,8 +134,8 @@ def optimize(dqn, target_dqn, memory, optimizer):
 	rewards = rewards.to(device)
 
 	# TODO: Compute the current estimates of the Q-values for each state-action
-	#       pair (s,a). Here, torch.gather() is useful for selecting the Q-values
-	#       corresponding to the chosen actions.
+	#	   pair (s,a). Here, torch.gather() is useful for selecting the Q-values
+	#	   corresponding to the chosen actions.
 	output = dqn.forward(observations) # [32, 2]
 	output = output.to(device)
 	q_values = torch.gather(input=output, index=actions, dim=1)
