@@ -96,10 +96,16 @@ class DQN(nn.Module):
 			with torch.no_grad():
 				#print(f"In act, obs.shape = {observation.shape}")
 				output = self.forward(observation)
-				actions = torch.argmax(output, dim=1) 
+				output = output[:,2:]
+				actions = torch.argmax(output, dim=1)
+				if actions.item() == 0 or actions.item() == 2:
+					actions[:] = 2
+				else:
+					actions[:] = 3
 		else:
 			# Choose a random action for each observation
-			random_actions = [random.randrange(self.n_actions) for _ in range(batch_size)]
+			# random_actions = [random.randrange(self.n_actions) for _ in range(batch_size)]
+			random_actions = [random.randrange(2,4) for _ in range(batch_size)]
 			actions = torch.tensor(random_actions)
 
 		return actions.unsqueeze(1)
@@ -147,6 +153,7 @@ def optimize(dqn, target_dqn, memory, optimizer):
 	target_dqn_qpred_max = torch.max(target_dqn_qpred, axis=1)[0].unsqueeze(1)
 	
 	q_value_targets = torch.zeros(dqn.batch_size, 1)
+	q_value_targets = q_value_targets.to(device)
 	q_value_targets[non_terminal_mask] = rewards[non_terminal_mask] + dqn.gamma * target_dqn_qpred_max
 	q_value_targets[terminal_mask] = rewards[terminal_mask]
 	

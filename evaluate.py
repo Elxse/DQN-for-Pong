@@ -31,25 +31,30 @@ def evaluate_policy(dqn, env, env_config, args, eps_start, n_episodes, render=Fa
 
 	for i in range(n_episodes):
 		obs = preprocess(env.reset(), env=args.env).unsqueeze(0)
+		obs_stack = torch.cat(env_config["obs_stack_size"] * [obs]).unsqueeze(0).to(device)
 
 		done = False
-		episode_return = 0
+		rewards_list = []
 
 		while not done:
 			if render:
 				env.render()
 				
 			if args.env == "Pong-v0":
-				obs_stack = torch.cat(env_config["obs_stack_size"] * [obs]).unsqueeze(0).to(device)
 				action = dqn.act(obs_stack, eps_start, exploit=True).item()
 			else:
 				action = dqn.act(obs, eps_start, exploit=True).item()
 			
 			obs, reward, done, info = env.step(action)
 			obs = preprocess(obs, env=args.env).unsqueeze(0)
+			if args.env == "Pong-v0":
+				obs_stack = torch.cat((obs_stack[:, 1:, ...], obs.unsqueeze(1)), dim=1).to(device)
+				obs_stack = preprocess(obs_stack, env=args.env)
+			# print(reward)
+			rewards_list.append(reward)
+			# episode_return = reward + (env_config['gamma'] * episode_return)
 
-			episode_return += reward
-		
+		episode_return = sum([env_config['gamma']**t * rewards_list[t] for t in range(len(rewards_list))])
 		total_return += episode_return
 		
 		if verbose:
