@@ -94,18 +94,17 @@ class DQN(nn.Module):
 		if exploit or rand_value > epsilon:
 			# Choose the action which gives the largest Q-values for each observation
 			with torch.no_grad():
-				#print(f"In act, obs.shape = {observation.shape}")
 				output = self.forward(observation)
-				output = output[:,2:]
+				#output = output[:,2:]
 				actions = torch.argmax(output, dim=1)
-				if actions.item() == 0 or actions.item() == 2:
-					actions[:] = 2
-				else:
-					actions[:] = 3
+				#if actions.item() == 0 or actions.item() == 2:
+				#	actions[:] = 2 # right
+				#else:
+				#	actions[:] = 3 # left
 		else:
 			# Choose a random action for each observation
-			# random_actions = [random.randrange(self.n_actions) for _ in range(batch_size)]
-			random_actions = [random.randrange(2,4) for _ in range(batch_size)]
+			random_actions = [random.randrange(self.n_actions) for _ in range(batch_size)]
+			#random_actions = [random.randrange(2,4) for _ in range(batch_size)]
 			actions = torch.tensor(random_actions)
 
 		return actions.unsqueeze(1)
@@ -122,17 +121,17 @@ def optimize(dqn, target_dqn, memory, optimizer):
 	#	   Remember to move them to GPU if it is available, e.g., by using Tensor.to(device).
 	#	   Note that special care is needed for terminal transitions!
 	observations, actions, next_observations, rewards = memory.sample(dqn.batch_size)
-	
-	observations = torch.cat(observations)  # [32, 4]
+
+	# Transform every tuple into tensors and move it to GPU if it is available	
+	observations = torch.cat(observations)
 	observations = observations.to(device)
-	#print(observations.shape)
+
 	non_terminal_next_observations = [next_obs for next_obs in next_observations if next_obs is not None]
-	#print(len(non_terminal_next_observations), non_terminal_next_observations[0].shape)
 	non_terminal_next_observations = torch.cat(non_terminal_next_observations).float()
 	non_terminal_next_observations = non_terminal_next_observations.to(device)
 	
 	actions = torch.stack(actions, dim=0)
-	actions = torch.unsqueeze(actions, 1) # [32, 1]
+	actions = torch.unsqueeze(actions, 1)
 	actions = actions.to(device)
 
 	rewards = torch.stack(rewards, dim=0)
@@ -142,7 +141,7 @@ def optimize(dqn, target_dqn, memory, optimizer):
 	# TODO: Compute the current estimates of the Q-values for each state-action
 	#	   pair (s,a). Here, torch.gather() is useful for selecting the Q-values
 	#	   corresponding to the chosen actions.
-	output = dqn.forward(observations) # [32, 2]
+	output = dqn.forward(observations)
 	output = output.to(device)
 	q_values = torch.gather(input=output, index=actions, dim=1)
 

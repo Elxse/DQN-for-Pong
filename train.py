@@ -36,8 +36,6 @@ if __name__ == '__main__':
         # Now every obs is numpy array of shape (84,84)
     env_config = ENV_CONFIGS[args.env]
 
-    # print(env.unwrapped.get_action_meanings())
-
     # Load Model
     try:
         model_name = str(args.model_name) + '_best.pt'
@@ -90,16 +88,12 @@ if __name__ == '__main__':
 
             # Get action from DQN.
             if args.env == "Pong-v0":
-                # obs_stack = torch.cat(env_config["obs_stack_size"] * [obs]).unsqueeze(0).to(device) # [1, 4, 84, 84]
                 action = dqn.act(obs_stack, eps).item()
             else:
                 action = dqn.act(obs, eps).item()
 
-            # print(action)
             # Act in the true environment.
             next_obs, reward, done, info = env.step(action)
-            # episode_return += reward
-            #episode_return = reward + (env_config['gamma'] * episode_return)
             episode_rewards.append(reward)
 
             # Preprocess incoming observation.
@@ -107,12 +101,8 @@ if __name__ == '__main__':
                 # Preprocess the non-terminal state.
                 next_obs = preprocess(next_obs, env=args.env).unsqueeze(0)
                 if args.env == "Pong-v0":
-                    #print(f"obs_stack = {obs_stack.shape}")
-                    #print(f"next_obs = {next_obs.shape}")
                     next_obs_stack = torch.cat((obs_stack[:, 1:, ...], next_obs.unsqueeze(1)), dim=1).to(device)
-
                     next_obs_stack = preprocess(next_obs_stack, env=args.env)
-                    #print(f"next_obs_stack = {next_obs_stack.shape}")
             else:
                 # Set to None the terminal state.
                 next_obs = None
