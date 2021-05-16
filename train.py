@@ -11,6 +11,7 @@ from evaluate import evaluate_policy
 from dqn import DQN, ReplayMemory, optimize
 
 import matplotlib.pyplot as plt
+import pickle
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -79,7 +80,7 @@ if __name__ == '__main__':
         episode_steps = 0
 
 
-        obs = preprocess(env.reset(), env=args.env).unsqueeze(0) # [1, 84, 84]
+        obs = preprocess(env.reset(), env=args.env).unsqueeze(0).to(device) # [1, 84, 84]
         obs_stack = torch.cat(env_config["obs_stack_size"] * [obs]).unsqueeze(0).to(device)  # [1, 4, 84, 84]
 
         while not done:
@@ -91,10 +92,12 @@ if __name__ == '__main__':
                 action = dqn.act(obs_stack, eps).item()
             else:
                 action = dqn.act(obs, eps).item()
+            action = torch.as_tensor(action).to(device)
 
             # Act in the true environment.
             next_obs, reward, done, info = env.step(action)
             episode_rewards.append(reward)
+            reward = torch.as_tensor(reward).to(device)
 
             # Preprocess incoming observation.
             if not done:
@@ -102,18 +105,18 @@ if __name__ == '__main__':
                 next_obs = preprocess(next_obs, env=args.env).unsqueeze(0)
                 if args.env == "Pong-v0":
                     next_obs_stack = torch.cat((obs_stack[:, 1:, ...], next_obs.unsqueeze(1)), dim=1).to(device)
-                    next_obs_stack = preprocess(next_obs_stack, env=args.env)
+                    next_obs_stack = preprocess(next_obs_stack, env=args.env).to(device)
             else:
                 # Set to None the terminal state.
                 next_obs = None
                 if args.env == "Pong-v0":
                     next_obs_stack = None
 
-            # Add the transition to the replay memory.
+            # Add the transition to the replay memory. Everything has been move to GPU if available.
             if args.env == "CartPole-v0":
-                memory.push(obs, torch.as_tensor(action), next_obs, torch.as_tensor(reward))
+                memory.push(obs, action, next_obs, reward)
             if args.env == "Pong-v0":
-                memory.push(obs_stack, torch.as_tensor(action), next_obs_stack, torch.as_tensor(reward))
+                memory.push(obs_stack, action, next_obs_stack, reward)
 
             # Run DQN.optimize() every env_config["train_frequency"] steps.
             if total_steps % env_config["train_frequency"] == 0:
@@ -156,11 +159,30 @@ if __name__ == '__main__':
 
     # Close environment after training is completed.
     env.close()
-
-
+    
+    # Load results pickle file to add new results from the pretrained model
+    results_file = f"results/{args.model_name}/{args.model_name}_results_lr_{env_config['lr']}_tg_{env_config['target_update_frequency']}_ann_{env_config['anneal_length']}.pkl"
+    try:
+        with open(results_file, 'rb') as file:
+            results_dict = pickle.load(file)
+        results_dict['return'].extend(return_list)
+        results_dict['loss'].extend(loss_list)
+        results_dict['step'].extend(step_list)
+        results_dict['epsilon'].extend(epsilon_list)
+    # Store results from the new trained model
+    except:
+        results_dict = {
+            'return': return_list,
+            'loss': loss_list,
+            'step': step_list,
+            'epsilon': epsilon_list
+        }
+        with open(results_file, 'wb') as file:
+            pickle.dump(results_dict, file)
+            
     # Plot
-    x_axis = range(env_config['n_episodes'])
-    plot_result(x_axis, return_list, "Episodes", "Return", title="Return vs. Number of episodes", save_path=f"results/{args.env}", env_name=args.env)
-    plot_result(x_axis, loss_list, "Episodes", "Loss", title="Loss vs. Number of episodes", save_path=f"results/{args.env}", env_name=args.env)
-    plot_result(x_axis, step_list, "Episodes", "Number of steps", title="Number of steps per episode", save_path=f"results/{args.env}", env_name=args.env)
-    plot_result(range(total_steps), epsilon_list, "Steps", "Epsilon", title="Epsilon values at each step of the training", save_path=f"results/{args.env}", env_name=args.env)
+    x_axis = range(len(results_dict['return']))
+    plot_result(x_axis, results_dict['return'], "Episodes", "Return", title="Return vs. Number of episodes", save_path=f"results/{args.env}", env_name=args.env)
+    plot_result(x_axis, results_dict['loss'], "Episodes", "Loss", title="Loss vs. Number of episodes", save_path=f"results/{args.env}", env_name=args.env)
+    plot_result(x_axis, results_dict['step'], "Episodes", "Number of steps", title="Number of steps per episode", save_path=f"results/{args.env}", env_name=args.env)
+    plot_result(range(len(results_dict['epsilon'])), results_dict['epsilon'], "Steps", "Epsilon", title="Epsilon values at each step of the training", save_path=f"results/{args.env}", env_name=args.env)

@@ -124,19 +124,19 @@ def optimize(dqn, target_dqn, memory, optimizer):
 
 	# Transform every tuple into tensors and move it to GPU if it is available	
 	observations = torch.cat(observations)
-	observations = observations.to(device)
+	#observations = observations.to(device)
 
 	non_terminal_next_observations = [next_obs for next_obs in next_observations if next_obs is not None]
 	non_terminal_next_observations = torch.cat(non_terminal_next_observations).float()
-	non_terminal_next_observations = non_terminal_next_observations.to(device)
+	#non_terminal_next_observations = non_terminal_next_observations.to(device)
 	
 	actions = torch.stack(actions, dim=0)
 	actions = torch.unsqueeze(actions, 1)
-	actions = actions.to(device)
+	#actions = actions.to(device)
 
 	rewards = torch.stack(rewards, dim=0)
 	rewards = torch.unsqueeze(rewards, 1)
-	rewards = rewards.to(device)
+	#rewards = rewards.to(device)
 
 	# TODO: Compute the current estimates of the Q-values for each state-action
 	#	   pair (s,a). Here, torch.gather() is useful for selecting the Q-values
