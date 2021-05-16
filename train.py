@@ -36,11 +36,12 @@ if __name__ == '__main__':
         env = AtariPreprocessing(env, screen_size=84, grayscale_obs=True, frame_skip=1, noop_max=30, scale_obs=True)
         # Now every obs is numpy array of shape (84,84)
     env_config = ENV_CONFIGS[args.env]
+    params = f"lr_{env_config['lr']}_gamma_{env_config['gamma']}_tg_{env_config['target_update_frequency']}_ann_{env_config['anneal_length']}" # can be changed to add more params in the plot file name
 
     # Load Model
     try:
-        model_name = str(args.model_name) + '_best.pt'
-        target_model_name = str(args.model_name) + '_target.pt'
+        model_name = f"{args.model_name}_best_{params}.pt"
+        target_model_name = f"{args.model_name}_target_{params}.pt"
         dqn = torch.load(f'models/{model_name}')
         target_dqn = torch.load(f'models/{target_model_name}')
     except:
@@ -72,6 +73,7 @@ if __name__ == '__main__':
 
     total_steps = 0
 
+    
     for episode in range(env_config['n_episodes']):
         done = False
 
@@ -81,7 +83,8 @@ if __name__ == '__main__':
 
 
         obs = preprocess(env.reset(), env=args.env).unsqueeze(0).to(device) # [1, 84, 84]
-        obs_stack = torch.cat(env_config["obs_stack_size"] * [obs]).unsqueeze(0).to(device)  # [1, 4, 84, 84]
+        if args.env == "Pong-v0":
+            obs_stack = torch.cat(env_config["obs_stack_size"] * [obs]).unsqueeze(0).to(device)  # [1, 4, 84, 84]
 
         while not done:
             total_steps += 1
@@ -92,12 +95,10 @@ if __name__ == '__main__':
                 action = dqn.act(obs_stack, eps).item()
             else:
                 action = dqn.act(obs, eps).item()
-            action = torch.as_tensor(action).to(device)
 
             # Act in the true environment.
             next_obs, reward, done, info = env.step(action)
             episode_rewards.append(reward)
-            reward = torch.as_tensor(reward).to(device)
 
             # Preprocess incoming observation.
             if not done:
@@ -113,6 +114,8 @@ if __name__ == '__main__':
                     next_obs_stack = None
 
             # Add the transition to the replay memory. Everything has been move to GPU if available.
+            action = torch.as_tensor(action).to(device)
+            reward = torch.as_tensor(reward).to(device)
             if args.env == "CartPole-v0":
                 memory.push(obs, action, next_obs, reward)
             if args.env == "Pong-v0":
@@ -129,7 +132,8 @@ if __name__ == '__main__':
 
             # Update the current observation.
             obs = next_obs
-            obs_stack = next_obs_stack
+            if args.env == "Pong-v0":
+                obs_stack = next_obs_stack
 
             # Update epsilon after each step.
             epsilon_list.append(eps)
@@ -137,7 +141,10 @@ if __name__ == '__main__':
                 eps -= eps_step
 
         # Compute the episode return
-        episode_return = sum([env_config['gamma'] ** t * episode_rewards[t] for t in range(len(episode_rewards))])
+        if env_config['gamma'] == 1:
+            episode_return = sum(episode_rewards)
+        else:
+            episode_return = sum([env_config['gamma']**t * episode_rewards[t] for t in range(len(episode_rewards))])
 
         # Evaluate the current agent.
         if episode % args.evaluate_freq == 0:
@@ -150,8 +157,8 @@ if __name__ == '__main__':
                 best_mean_return = mean_return
 
                 print('Best performance so far! Saving model.')
-                torch.save(dqn, f'models/{args.env}_best.pt')
-                torch.save(target_dqn, f'models/{args.env}_target.pt')
+                torch.save(dqn, f'models/{args.env}_best_{params}.pt')
+                torch.save(target_dqn, f'models/{args.env}_target_{params}.pt')
 
         loss_list.append(episode_loss/episode_steps)
         return_list.append(episode_return)
@@ -161,7 +168,7 @@ if __name__ == '__main__':
     env.close()
     
     # Load results pickle file to add new results from the pretrained model
-    results_file = f"results/{args.model_name}/{args.model_name}_results_lr_{env_config['lr']}_tg_{env_config['target_update_frequency']}_ann_{env_config['anneal_length']}.pkl"
+    results_file = f"results/{args.model_name}/{args.model_name}_results_{params}.pkl"
     try:
         with open(results_file, 'rb') as file:
             results_dict = pickle.load(file)
@@ -182,7 +189,7 @@ if __name__ == '__main__':
             
     # Plot
     x_axis = range(len(results_dict['return']))
-    plot_result(x_axis, results_dict['return'], "Episodes", "Return", title="Return vs. Number of episodes", save_path=f"results/{args.env}", env_name=args.env)
-    plot_result(x_axis, results_dict['loss'], "Episodes", "Loss", title="Loss vs. Number of episodes", save_path=f"results/{args.env}", env_name=args.env)
-    plot_result(x_axis, results_dict['step'], "Episodes", "Number of steps", title="Number of steps per episode", save_path=f"results/{args.env}", env_name=args.env)
-    plot_result(range(len(results_dict['epsilon'])), results_dict['epsilon'], "Steps", "Epsilon", title="Epsilon values at each step of the training", save_path=f"results/{args.env}", env_name=args.env)
+    plot_result(x_axis, results_dict['return'], "Episodes", "Return", title="Return vs. Number of episodes", save_path=f"results/{args.env}", env_name=args.env, params=params)
+    plot_result(x_axis, results_dict['loss'], "Episodes", "Loss", title="Loss vs. Number of episodes", save_path=f"results/{args.env}", env_name=args.env, params=params)
+    plot_result(x_axis, results_dict['step'], "Episodes", "Number of steps", title="Number of steps per episode", save_path=f"results/{args.env}", env_name=args.env, params=params)
+    plot_result(range(len(results_dict['epsilon'])), results_dict['epsilon'], "Steps", "Epsilon", title="Epsilon values at each step of the training", save_path=f"results/{args.env}", env_name=args.env, params=params)

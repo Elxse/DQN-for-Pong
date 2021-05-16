@@ -21,10 +21,10 @@ def init_weights(model):
 		torch.nn.init.normal_(model.weight, mean=0, std=0.01)
 		torch.nn.init.zeros_(model.bias)
 
-def plot_result(x, y, xlabel, ylabel, title, save_path, env_name):
+def plot_result(x, y, xlabel, ylabel, title, save_path, env_name, params):
 	plt.plot(x, y)
 	plt.title(title)
 	plt.xlabel(xlabel)
 	plt.ylabel(ylabel)
-	plt.savefig(f"{save_path}/{env_name}_{title}.png")
+	plt.savefig(f"{save_path}/{env_name}_{title}_{params}.png")
 	plt.show()

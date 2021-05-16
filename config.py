@@ -18,11 +18,11 @@ n_actions: The number of actions can easily be accessed with env.action_space.n,
 # Hyperparameters for CartPole-v0
 CartPole = {
     'memory_size': 50000,
-    'n_episodes': 1000,
+    'n_episodes': 500,
     'batch_size': 32,
     'target_update_frequency': 100, # 100 
     'train_frequency': 1,
-    'gamma': 0.95,
+    'gamma': 0.95, # 0.95
     'lr': 1e-4,
     'eps_start': 1,
     'eps_end': 0.05,
