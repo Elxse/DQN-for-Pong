@@ -34,14 +34,14 @@ CartPole = {
 Pong = {
     'obs_stack_size': 4,
     'memory_size': 10000,
-    'n_episodes': 1,
+    'n_episodes': 1000,
     'batch_size': 32,
     'target_update_frequency': 1000,
     'train_frequency': 4,
-    'gamma': 1,
+    'gamma': 0.99,
     'lr': 1e-4,
     'eps_start': 1.0,
     'eps_end': 0.01,
     'anneal_length': 10**6,
-    'n_actions': 6, # how to map to 2 actions only?
+    'n_actions': 2,
 }

@@ -25,7 +25,7 @@ ENV_CONFIGS = {
 	'Pong-v0': config.Pong
 }
 
-def evaluate_policy(dqn, env, env_config, args, eps_start, n_episodes, render=False, verbose=False):
+def evaluate_policy(dqn, env, env_config, args, eps_start, n_episodes, discounted=False, render=False, verbose=False):
 	"""Runs {n_episodes} episodes to evaluate current policy."""
 	total_return = 0
 
@@ -54,10 +54,10 @@ def evaluate_policy(dqn, env, env_config, args, eps_start, n_episodes, render=Fa
 			
 			rewards_list.append(reward)
 
-		if env_config['gamma'] == 1:
-			episode_return = sum(rewards_list)
-		else:
+		if discounted:
 			episode_return = sum([env_config['gamma']**t * rewards_list[t] for t in range(len(rewards_list))])
+		else:
+			episode_return = sum(rewards_list)
 		total_return += episode_return
 		
 		if verbose:

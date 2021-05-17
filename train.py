@@ -69,7 +69,7 @@ if __name__ == '__main__':
     eps_step = (eps - eps_end) / anneal_length
 
     # Initialize lists to keep track of episodes' loss, return, number of steps, and epsilon values throughout the training
-    loss_list, return_list, step_list, epsilon_list = [], [], [], []
+    loss_list, return_list, eval_return_list, step_list, epsilon_list = [], [], [], [], []
 
     total_steps = 0
 
@@ -141,14 +141,13 @@ if __name__ == '__main__':
                 eps -= eps_step
 
         # Compute the episode return
-        if env_config['gamma'] == 1:
-            episode_return = sum(episode_rewards)
-        else:
-            episode_return = sum([env_config['gamma']**t * episode_rewards[t] for t in range(len(episode_rewards))])
+        episode_undiscounted_return = sum(episode_rewards)
+        #episode_discounted_return = sum([env_config['gamma']**t * episode_rewards[t] for t in range(len(episode_rewards))])
 
         # Evaluate the current agent.
         if episode % args.evaluate_freq == 0:
             mean_return = evaluate_policy(dqn, env, env_config, args, eps, n_episodes=args.evaluation_episodes)
+            eval_return_list.append(mean_return)
 
             print(f'Episode {episode}/{env_config["n_episodes"]}: {mean_return}')
 
@@ -161,7 +160,7 @@ if __name__ == '__main__':
                 torch.save(target_dqn, f'models/{args.env}_target_{params}.pt')
 
         loss_list.append(episode_loss/episode_steps)
-        return_list.append(episode_return)
+        return_list.append(episode_undiscounted_return)
         step_list.append(episode_steps)
 
     # Close environment after training is completed.
@@ -173,6 +172,7 @@ if __name__ == '__main__':
         with open(results_file, 'rb') as file:
             results_dict = pickle.load(file)
         results_dict['return'].extend(return_list)
+        results_dict['eval_return'].extend(eval_return_list)
         results_dict['loss'].extend(loss_list)
         results_dict['step'].extend(step_list)
         results_dict['epsilon'].extend(epsilon_list)
@@ -180,6 +180,7 @@ if __name__ == '__main__':
     except:
         results_dict = {
             'return': return_list,
+            'eval_return': eval_return_list,
             'loss': loss_list,
             'step': step_list,
             'epsilon': epsilon_list
@@ -190,6 +191,7 @@ if __name__ == '__main__':
     # Plot
     x_axis = range(len(results_dict['return']))
     plot_result(x_axis, results_dict['return'], "Episodes", "Return", title="Return vs. Number of episodes", save_path=f"results/{args.env}", env_name=args.env, params=params)
+    plot_result(range(len(results_dict['eval_return'])), results_dict['eval_return'], "Episodes", "Return", title="Evaluation Return every 25 episodes", save_path=f"results/{args.env}", env_name=args.env, params=params)
     plot_result(x_axis, results_dict['loss'], "Episodes", "Loss", title="Loss vs. Number of episodes", save_path=f"results/{args.env}", env_name=args.env, params=params)
     plot_result(x_axis, results_dict['step'], "Episodes", "Number of steps", title="Number of steps per episode", save_path=f"results/{args.env}", env_name=args.env, params=params)
     plot_result(range(len(results_dict['epsilon'])), results_dict['epsilon'], "Steps", "Epsilon", title="Epsilon values at each step of the training", save_path=f"results/{args.env}", env_name=args.env, params=params)

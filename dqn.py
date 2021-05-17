@@ -95,16 +95,15 @@ class DQN(nn.Module):
 			# Choose the action which gives the largest Q-values for each observation
 			with torch.no_grad():
 				output = self.forward(observation)
-				#output = output[:,2:]
 				actions = torch.argmax(output, dim=1)
-				#if actions.item() == 0 or actions.item() == 2:
-				#	actions[:] = 2 # right
-				#else:
-				#	actions[:] = 3 # left
+				if self.env_name == "Pong-v0": 
+					if actions.item() == 0:
+						actions = 2 # right
+					else:
+						actions = 3 # left
 		else:
 			# Choose a random action for each observation
 			random_actions = [random.randrange(self.n_actions) for _ in range(batch_size)]
-			#random_actions = [random.randrange(2,4) for _ in range(batch_size)]
 			actions = torch.tensor(random_actions)
 
 		return actions.unsqueeze(1)
