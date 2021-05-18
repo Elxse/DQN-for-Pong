@@ -44,7 +44,9 @@ if __name__ == '__main__':
         target_model_name = f"{args.model_name}_target_{params}.pt"
         dqn = torch.load(f'models/{model_name}')
         target_dqn = torch.load(f'models/{target_model_name}')
+        print("Loading model...")
     except:
+        print("Initialize model...")
         # Initialize deep Q-networks.
         dqn = DQN(env_name=args.env, env_config=env_config).to(device)
         dqn.apply(init_weights)
@@ -52,6 +54,22 @@ if __name__ == '__main__':
         # Create and initialize target Q-network.
         target_dqn = DQN(env_name=args.env, env_config=env_config).to(device)
         target_dqn.load_state_dict(dqn.state_dict())
+    
+    # Load results pickle file to add new results from the pretrained model
+    results_file = f"results/{args.model_name}/{args.model_name}_results_{params}.pkl"
+    try:
+        with open(results_file, 'rb') as file:
+            results_dict = pickle.load(file)
+        print("Load pickle file")
+        return_list = results_dict['return']
+        eval_return_list = results_dict['eval_return']
+        loss_list = results_dict['loss']
+        step_list = results_dict['step']
+        epsilon_list = results_dict['epsilon']
+        dqn.eps_start = results_dict['eps_start']
+    except:
+        # Initialize lists to keep track of episodes' loss, return, number of steps, and epsilon values throughout the training
+        loss_list, return_list, eval_return_list, step_list, epsilon_list = [], [], [], [], []
 
     # Create replay memory.
     memory = ReplayMemory(env_config['memory_size'])
@@ -68,8 +86,7 @@ if __name__ == '__main__':
     anneal_length = dqn.anneal_length
     eps_step = (eps - eps_end) / anneal_length
 
-    # Initialize lists to keep track of episodes' loss, return, number of steps, and epsilon values throughout the training
-    loss_list, return_list, eval_return_list, step_list, epsilon_list = [], [], [], [], []
+    
 
     total_steps = 0
 
@@ -103,7 +120,7 @@ if __name__ == '__main__':
             # Preprocess incoming observation.
             if not done:
                 # Preprocess the non-terminal state.
-                next_obs = preprocess(next_obs, env=args.env).unsqueeze(0)
+                next_obs = preprocess(next_obs, env=args.env).unsqueeze(0).to(device)
                 if args.env == "Pong-v0":
                     next_obs_stack = torch.cat((obs_stack[:, 1:, ...], next_obs.unsqueeze(1)), dim=1).to(device)
                     next_obs_stack = preprocess(next_obs_stack, env=args.env).to(device)
@@ -166,27 +183,18 @@ if __name__ == '__main__':
     # Close environment after training is completed.
     env.close()
     
-    # Load results pickle file to add new results from the pretrained model
-    results_file = f"results/{args.model_name}/{args.model_name}_results_{params}.pkl"
-    try:
-        with open(results_file, 'rb') as file:
-            results_dict = pickle.load(file)
-        results_dict['return'].extend(return_list)
-        results_dict['eval_return'].extend(eval_return_list)
-        results_dict['loss'].extend(loss_list)
-        results_dict['step'].extend(step_list)
-        results_dict['epsilon'].extend(epsilon_list)
-    # Store results from the new trained model
-    except:
-        results_dict = {
-            'return': return_list,
-            'eval_return': eval_return_list,
-            'loss': loss_list,
-            'step': step_list,
-            'epsilon': epsilon_list
-        }
-        with open(results_file, 'wb') as file:
-            pickle.dump(results_dict, file)
+    # Save results
+    results_dict = {
+        'return': return_list,
+        'eval_return': eval_return_list,
+        'loss': loss_list,
+        'step': step_list,
+        'epsilon': epsilon_list,
+        "eps_start": eps
+    }
+    print("Save pickle file")
+    with open(results_file, 'wb') as file:
+        pickle.dump(results_dict, file)
             
     # Plot
     x_axis = range(len(results_dict['return']))
