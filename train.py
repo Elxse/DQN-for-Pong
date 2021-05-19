@@ -67,18 +67,21 @@ if __name__ == '__main__':
         step_list = results_dict['step']
         epsilon_list = results_dict['epsilon']
         dqn.eps_start = results_dict['eps_start']
+        best_mean_return = results_dict['best_mean_return']
+        memory = results_dict['memory']
+        print(f"best_mean_return = {best_mean_return}")
     except:
         # Initialize lists to keep track of episodes' loss, return, number of steps, and epsilon values throughout the training
         loss_list, return_list, eval_return_list, step_list, epsilon_list = [], [], [], [], []
-
-    # Create replay memory.
-    memory = ReplayMemory(env_config['memory_size'])
+        # Keep track of best evaluation mean return achieved so far.
+        best_mean_return = -float("Inf")
+        # Create replay memory.
+        memory = ReplayMemory(env_config['memory_size'])
 
     # Initialize optimizer used for training the DQN. We use Adam rather than RMSProp.
     optimizer = torch.optim.Adam(dqn.parameters(), lr=env_config['lr'])
 
-    # Keep track of best evaluation mean return achieved so far.
-    best_mean_return = -float("Inf")
+    
 
     # Compute the value for epsilon linear annealing.
     eps = dqn.eps_start
@@ -160,7 +163,11 @@ if __name__ == '__main__':
         # Compute the episode return
         episode_undiscounted_return = sum(episode_rewards)
         #episode_discounted_return = sum([env_config['gamma']**t * episode_rewards[t] for t in range(len(episode_rewards))])
-
+        
+        loss_list.append(episode_loss/episode_steps)
+        return_list.append(episode_undiscounted_return)
+        step_list.append(episode_steps)
+        
         # Evaluate the current agent.
         if episode % args.evaluate_freq == 0:
             mean_return = evaluate_policy(dqn, env, env_config, args, eps, n_episodes=args.evaluation_episodes)
@@ -175,10 +182,29 @@ if __name__ == '__main__':
                 print('Best performance so far! Saving model.')
                 torch.save(dqn, f'models/{args.env}_best_{params}.pt')
                 torch.save(target_dqn, f'models/{args.env}_target_{params}.pt')
-
-        loss_list.append(episode_loss/episode_steps)
-        return_list.append(episode_undiscounted_return)
-        step_list.append(episode_steps)
+            
+            # Save results
+            results_dict = {
+                'return': return_list,
+                'eval_return': eval_return_list,
+                'loss': loss_list,
+                'step': step_list,
+                'epsilon': epsilon_list,
+                'eps_start': eps,
+                'best_mean_return': best_mean_return,
+                'memory': memory
+            }
+            print("Save pickle file")
+            with open(results_file, 'wb') as file:
+                pickle.dump(results_dict, file)
+                    
+            # Plot
+            x_axis = range(len(results_dict['return']))
+            plot_result(x_axis, results_dict['return'], "Episodes", "Return", title="Return vs. Number of episodes", save_path=f"results/{args.env}", env_name=args.env, params=params)
+            plot_result(range(len(results_dict['eval_return'])), results_dict['eval_return'], "Episodes", "Return", title="Evaluation Return every 25 episodes", save_path=f"results/{args.env}", env_name=args.env, params=params)
+            plot_result(x_axis, results_dict['loss'], "Episodes", "Loss", title="Loss vs. Number of episodes", save_path=f"results/{args.env}", env_name=args.env, params=params)
+            plot_result(x_axis, results_dict['step'], "Episodes", "Number of steps", title="Number of steps per episode", save_path=f"results/{args.env}", env_name=args.env, params=params)
+            plot_result(range(len(results_dict['epsilon'])), results_dict['epsilon'], "Steps", "Epsilon", title="Epsilon values at each step of the training", save_path=f"results/{args.env}", env_name=args.env, params=params)
 
     # Close environment after training is completed.
     env.close()
@@ -190,7 +216,9 @@ if __name__ == '__main__':
         'loss': loss_list,
         'step': step_list,
         'epsilon': epsilon_list,
-        "eps_start": eps
+        'eps_start': eps,
+        'best_mean_return': best_mean_return,
+        'memory': memory
     }
     print("Save pickle file")
     with open(results_file, 'wb') as file:
