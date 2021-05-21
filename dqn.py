@@ -104,10 +104,11 @@ class DQN(nn.Module):
 						actions = torch.tensor([3]) # left
 		else:
 			# Choose a random action for each observation
-			#random_actions = [random.randrange(self.n_actions) for _ in range(batch_size)]
-			random_actions = [random.randrange(2,4) for _ in range(batch_size)]
+			if self.env_name == "CartPole-v0":
+				random_actions = [random.randrange(self.n_actions) for _ in range(batch_size)]
+			if self.env_name == "Pong-v0":
+				random_actions = [random.randrange(2,4) for _ in range(batch_size)]
 			actions = torch.tensor(random_actions)
-        #print(actions, actions.shape)
 		return actions.unsqueeze(1)
 
 def optimize(dqn, target_dqn, memory, optimizer):
@@ -129,22 +130,22 @@ def optimize(dqn, target_dqn, memory, optimizer):
 
 	non_terminal_next_observations = [next_obs for next_obs in next_observations if next_obs is not None]
 	non_terminal_next_observations = torch.cat(non_terminal_next_observations).float()
-	#non_terminal_next_observations = non_terminal_next_observations.to(device)
 	
 	actions = torch.stack(actions, dim=0)
 	actions = torch.unsqueeze(actions, 1)
-	#actions = actions.to(device)
 
 	rewards = torch.stack(rewards, dim=0)
 	rewards = torch.unsqueeze(rewards, 1)
-	#rewards = rewards.to(device)
 
 	# TODO: Compute the current estimates of the Q-values for each state-action
 	#	   pair (s,a). Here, torch.gather() is useful for selecting the Q-values
 	#	   corresponding to the chosen actions.
 	output = dqn.forward(observations)
 	output = output.to(device)
-	q_values = torch.gather(input=output, index=actions-2, dim=1)
+	if dqn.env_name == "CartPole-v0":
+		q_values = torch.gather(input=output, index=actions, dim=1)
+	if dqn.env_name == "Pong-v0":
+		q_values = torch.gather(input=output, index=actions-2, dim=1)
 
 	# TODO: Compute the Q-value targets. Only do this for non-terminal transitions!
 	non_terminal_mask = torch.BoolTensor(list(map(lambda obs: obs is not None, next_observations))) # indices for non terminal transitions
