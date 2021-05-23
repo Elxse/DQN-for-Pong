@@ -34,11 +34,10 @@ if __name__ == '__main__':
     env = gym.make(args.env)
     if args.env == "Pong-v0":
         env = AtariPreprocessing(env, screen_size=84, grayscale_obs=True, frame_skip=1, noop_max=30, scale_obs=True)
-        # Now every obs is numpy array of shape (84,84)
     env_config = ENV_CONFIGS[args.env]
-    params = f"lr_{env_config['lr']}_gamma_{env_config['gamma']}_tg_{env_config['target_update_frequency']}_ann_{env_config['anneal_length']}" # can be changed to add more params in the plot file name
+    params = f"lr_{env_config['lr']}_gamma_{env_config['gamma']}_tg_{env_config['target_update_frequency']}_ann_{env_config['anneal_length']}"
 
-    # Load Model
+    # Load Model.
     try:
         model_name = f"{args.env}_best_{params}_ax.pt"
         target_model_name = f"{args.env}_target_{params}_ax.pt"
@@ -47,6 +46,7 @@ if __name__ == '__main__':
         print("Loading model...")
     except:
         print("Initialize model...")
+
         # Initialize deep Q-networks.
         dqn = DQN(env_name=args.env, env_config=env_config).to(device)
         dqn.apply(init_weights)
@@ -55,7 +55,7 @@ if __name__ == '__main__':
         target_dqn = DQN(env_name=args.env, env_config=env_config).to(device)
         target_dqn.load_state_dict(dqn.state_dict())
     
-    # Load results pickle file to add new results from the pretrained model
+    # Load results pickle file to add new results from the pretrained model.
     results_file = f"results/{args.env}/{args.env}_results_{params}.pkl"
     try:
         with open(results_file, 'rb') as file:
@@ -71,29 +71,27 @@ if __name__ == '__main__':
         memory = results_dict['memory']
         print(f"best_mean_return = {best_mean_return}")
     except:
-        # Initialize lists to keep track of episodes' loss, return, number of steps, and epsilon values throughout the training
+        # Initialize lists to keep track of episodes' loss, return, number of steps, and epsilon values throughout the training.
         loss_list, return_list, eval_return_list, step_list, epsilon_list = [], [], [], [], []
+
         # Keep track of best evaluation mean return achieved so far.
         best_mean_return = -float("Inf")
+
         # Create replay memory.
         memory = ReplayMemory(env_config['memory_size'])
 
     # Initialize optimizer used for training the DQN. We use Adam rather than RMSProp.
     optimizer = torch.optim.Adam(dqn.parameters(), lr=env_config['lr'])
 
-    
-
     # Compute the value for epsilon linear annealing.
     eps = dqn.eps_start
     eps_end = dqn.eps_end
     anneal_length = dqn.anneal_length
     eps_step = (eps - eps_end) / anneal_length
-    # eps_step = 0
     
-
+	# Keep track of the total number of steps.
     total_steps = 0
 
-    
     for episode in range(env_config['n_episodes']):
         done = False
 
@@ -101,10 +99,9 @@ if __name__ == '__main__':
         episode_rewards = []
         episode_steps = 0
 
-
-        obs = preprocess(env.reset(), env=args.env).unsqueeze(0).to(device) # [1, 84, 84]
+        obs = preprocess(env.reset(), env=args.env).unsqueeze(0).to(device)
         if args.env == "Pong-v0":
-            obs_stack = torch.cat(env_config["obs_stack_size"] * [obs]).unsqueeze(0).to(device)  # [1, 4, 84, 84]
+            obs_stack = torch.cat(env_config["obs_stack_size"] * [obs]).unsqueeze(0).to(device)
 
         while not done:
             total_steps += 1
@@ -160,10 +157,10 @@ if __name__ == '__main__':
             if eps > eps_end:
                 eps -= eps_step
 
-        # Compute the episode return
+        # Compute the episode return.
         episode_undiscounted_return = sum(episode_rewards)
-        #episode_discounted_return = sum([env_config['gamma']**t * episode_rewards[t] for t in range(len(episode_rewards))])
-        
+
+	   	# Add results to lists.
         loss_list.append(episode_loss/episode_steps)
         return_list.append(episode_undiscounted_return)
         step_list.append(episode_steps)
@@ -183,7 +180,7 @@ if __name__ == '__main__':
                 torch.save(dqn, f'models/{args.env}_best_{params}.pt')
                 torch.save(target_dqn, f'models/{args.env}_target_{params}.pt')
             
-            # Save results
+            # Save results.
             results_dict = {
                 'return': return_list,
                 'eval_return': eval_return_list,
@@ -209,7 +206,7 @@ if __name__ == '__main__':
     # Close environment after training is completed.
     env.close()
     
-    # Save results
+    # Save results.
     results_dict = {
         'return': return_list,
         'eval_return': eval_return_list,
@@ -224,7 +221,7 @@ if __name__ == '__main__':
     with open(results_file, 'wb') as file:
         pickle.dump(results_dict, file)
             
-    # Plot
+    # Plot.
     x_axis = range(len(results_dict['return']))
     plot_result(x_axis, results_dict['return'], "Episodes", "Return", title="Return vs. Number of episodes", save_path=f"results/{args.env}", env_name=args.env, params=params)
     plot_result(range(len(results_dict['eval_return'])), results_dict['eval_return'], "Episodes", "Return", title="Evaluation Return every 25 episodes", save_path=f"results/{args.env}", env_name=args.env, params=params)
