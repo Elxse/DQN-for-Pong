@@ -16,7 +16,7 @@ import pickle
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--env', default='Pong-v0', choices=['CartPole-v0', 'Pong-v0'])
+parser.add_argument('--env', default='CartPole-v0', choices=['CartPole-v0', 'Pong-v0'])
 parser.add_argument('--evaluate_freq', type=int, default=25, help='How often to run evaluation.', nargs='?')
 parser.add_argument('--evaluation_episodes', type=int, default=5, help='Number of evaluation episodes.', nargs='?')
 parser.add_argument('--model_name', default='Pong-v0', help='Model to load if present.', nargs='?')
@@ -40,8 +40,8 @@ if __name__ == '__main__':
 
     # Load Model
     try:
-        model_name = f"{args.model_name}_best_{params}.pt"
-        target_model_name = f"{args.model_name}_target_{params}.pt"
+        model_name = f"{args.env}_best_{params}_ax.pt"
+        target_model_name = f"{args.env}_target_{params}_ax.pt"
         dqn = torch.load(f'models/{model_name}')
         target_dqn = torch.load(f'models/{target_model_name}')
         print("Loading model...")
@@ -56,7 +56,7 @@ if __name__ == '__main__':
         target_dqn.load_state_dict(dqn.state_dict())
     
     # Load results pickle file to add new results from the pretrained model
-    results_file = f"results/{args.model_name}/{args.model_name}_results_{params}.pkl"
+    results_file = f"results/{args.env}/{args.env}_results_{params}.pkl"
     try:
         with open(results_file, 'rb') as file:
             results_dict = pickle.load(file)
@@ -88,7 +88,7 @@ if __name__ == '__main__':
     eps_end = dqn.eps_end
     anneal_length = dqn.anneal_length
     eps_step = (eps - eps_end) / anneal_length
-
+    # eps_step = 0
     
 
     total_steps = 0
@@ -199,12 +199,12 @@ if __name__ == '__main__':
                 pickle.dump(results_dict, file)
                     
             # Plot
-            x_axis = range(len(results_dict['return']))
-            plot_result(x_axis, results_dict['return'], "Episodes", "Return", title="Return vs. Number of episodes", save_path=f"results/{args.env}", env_name=args.env, params=params)
-            plot_result(range(len(results_dict['eval_return'])), results_dict['eval_return'], "Episodes", "Return", title="Evaluation Return every 25 episodes", save_path=f"results/{args.env}", env_name=args.env, params=params)
-            plot_result(x_axis, results_dict['loss'], "Episodes", "Loss", title="Loss vs. Number of episodes", save_path=f"results/{args.env}", env_name=args.env, params=params)
-            plot_result(x_axis, results_dict['step'], "Episodes", "Number of steps", title="Number of steps per episode", save_path=f"results/{args.env}", env_name=args.env, params=params)
-            plot_result(range(len(results_dict['epsilon'])), results_dict['epsilon'], "Steps", "Epsilon", title="Epsilon values at each step of the training", save_path=f"results/{args.env}", env_name=args.env, params=params)
+            # x_axis = range(len(results_dict['return']))
+            # plot_result(x_axis, results_dict['return'], "Episodes", "Return", title="Return vs. Number of episodes", save_path=f"results/{args.env}", env_name=args.env, params=params)
+            # plot_result(range(len(results_dict['eval_return'])), results_dict['eval_return'], "Episodes", "Return", title="Evaluation Return every 25 episodes", save_path=f"results/{args.env}", env_name=args.env, params=params)
+            # plot_result(x_axis, results_dict['loss'], "Episodes", "Loss", title="Loss vs. Number of episodes", save_path=f"results/{args.env}", env_name=args.env, params=params)
+            # plot_result(x_axis, results_dict['step'], "Episodes", "Number of steps", title="Number of steps per episode", save_path=f"results/{args.env}", env_name=args.env, params=params)
+            # plot_result(range(len(results_dict['epsilon'])), results_dict['epsilon'], "Steps", "Epsilon", title="Epsilon values at each step of the training", save_path=f"results/{args.env}", env_name=args.env, params=params)
 
     # Close environment after training is completed.
     env.close()

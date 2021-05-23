@@ -105,7 +105,10 @@ class DQN(nn.Module):
 		else:
 			# Choose a random action for each observation
 			#random_actions = [random.randrange(self.n_actions) for _ in range(batch_size)]
-			random_actions = [random.randrange(2,4) for _ in range(batch_size)]
+			if self.env_name == "CartPole-v0":
+				random_actions = [random.randrange(self.n_actions) for _ in range(batch_size)]
+			if self.env_name == "Pong-v0":
+				random_actions = [random.randrange(2, 4) for _ in range(batch_size)]
 			actions = torch.tensor(random_actions)
         #print(actions, actions.shape)
 		return actions.unsqueeze(1)
@@ -144,7 +147,10 @@ def optimize(dqn, target_dqn, memory, optimizer):
 	#	   corresponding to the chosen actions.
 	output = dqn.forward(observations)
 	output = output.to(device)
-	q_values = torch.gather(input=output, index=actions-2, dim=1)
+	if dqn.env_name == "CartPole-v0":
+		q_values = torch.gather(input=output, index=actions, dim=1)
+	if dqn.env_name == "Pong-v0":
+		q_values = torch.gather(input=output, index=actions - 2, dim=1)
 
 	# TODO: Compute the Q-value targets. Only do this for non-terminal transitions!
 	non_terminal_mask = torch.BoolTensor(list(map(lambda obs: obs is not None, next_observations))) # indices for non terminal transitions
