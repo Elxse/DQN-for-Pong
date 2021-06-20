@@ -11,7 +11,7 @@ from utils import preprocess
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--env', default='CartPole-v0', choices=['CartPole-v0'])
+parser.add_argument('--env', default='Pong-v0', choices=['CartPole-v0', 'Pong-v0'])
 parser.add_argument('--path', type=str, help='Path to stored DQN model.')
 parser.add_argument('--n_eval_episodes', type=int, default=1, help='Number of evaluation episodes.', nargs='?')
 parser.add_argument('--render', dest='render', action='store_true', help='Render the environment.')
@@ -22,29 +22,42 @@ parser.set_defaults(save_video=False)
 # Hyperparameter configurations for different environments. See config.py.
 ENV_CONFIGS = {
 	'CartPole-v0': config.CartPole,
+	'Pong-v0': config.Pong
 }
 
-def evaluate_policy(dqn, env, env_config, args, eps_start, n_episodes, render=False, verbose=False):
+def evaluate_policy(dqn, env, env_config, args, eps_start, n_episodes, discounted=False, render=False, verbose=False):
 	"""Runs {n_episodes} episodes to evaluate current policy."""
 	total_return = 0
 
 	for i in range(n_episodes):
 		obs = preprocess(env.reset(), env=args.env).unsqueeze(0)
+		if args.env == "Pong-v0":
+			obs_stack = torch.cat(env_config["obs_stack_size"] * [obs]).unsqueeze(0).to(device)
 
 		done = False
-		episode_return = 0
+		rewards_list = []
 
 		while not done:
 			if render:
 				env.render()
-
-			action = dqn.act(obs, eps_start, exploit=True).item()
-
+				
+			if args.env == "Pong-v0":
+				action = dqn.act(obs_stack, eps_start, exploit=True).item()
+			else:
+				action = dqn.act(obs, eps_start, exploit=True).item()
+			
 			obs, reward, done, info = env.step(action)
 			obs = preprocess(obs, env=args.env).unsqueeze(0)
+			if args.env == "Pong-v0":
+				obs_stack = torch.cat((obs_stack[:, 1:, ...], obs.unsqueeze(1)), dim=1).to(device)
+				obs_stack = preprocess(obs_stack, env=args.env)
+			
+			rewards_list.append(reward)
 
-			episode_return += reward
-		
+		if discounted:
+			episode_return = sum([env_config['gamma']**t * rewards_list[t] for t in range(len(rewards_list))])
+		else:
+			episode_return = sum(rewards_list)
 		total_return += episode_return
 		
 		if verbose:
